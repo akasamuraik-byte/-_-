@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アニメ美術サークル_クロッキー</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts (Noto Sans JP) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    /* ドラッグオーバー時のエフェクト */
+    .drag-over {
+      border-color: #f59e0b !important;
+      background-color: rgba(245, 158, 11, 0.1) !important;
+    }
+    /* カスタムスクロールバー（画像一覧用） */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #18181b;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3f3f46;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #52525b;
+    }
+  </style>
+</head>
+<body class="bg-zinc-900 text-zinc-100 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+  <!-- 左上固定タイトル (1.〜10.の間ずっと固定表示) -->
+  <header class="fixed top-0 left-0 p-6 z-40">
+    <h1 class="text-xl md:text-2xl font-bold tracking-wider text-amber-500 drop-shadow-md">
+      クロッキー会
+    </h1>
+  </header>
+
+  <!-- 通知メッセージボックス (alert() の代替) -->
+  <div id="toast-message" class="fixed top-6 right-6 z-50 transform translate-y-[-100px] opacity-0 transition-all duration-300 bg-zinc-800 border border-amber-500 text-amber-400 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+    <span id="toast-text" class="text-sm font-bold">通知メッセージ</span>
+  </div>
+
+  <!-- メインコンテンツエリア -->
+  <main class="flex-grow flex items-stretch p-4 md:p-6 mt-16 mb-6">
+    <div class="w-full max-w-7xl mx-auto flex flex-col md:flex-row gap-6">
+
+      <!-- ==========================================
+           左側: 画像保存枠（ランダム表示中も常設、終了画面では非表示）
+           ========================================== -->
+      <section id="left-sidebar" class="w-full md:w-80 flex-shrink-0 flex flex-col no-print">
+        <div class="bg-zinc-800/60 border border-zinc-700/60 rounded-2xl p-4 flex flex-col gap-4 shadow-lg">
+          <div>
+            <h2 class="text-base font-bold text-zinc-200 mb-2 flex items-center justify-between">
+              <span>画像保存枠</span>
+              <span id="save-count-badge" class="text-xs bg-zinc-950 px-2 py-0.5 rounded-full text-amber-500 font-mono font-bold">0 / 50</span>
+            </h2>
+            
+            <!-- ドラッグ＆ドロップエリア -->
+            <div id="drop-zone" class="border-2 border-dashed border-zinc-600 hover:border-amber-500 bg-zinc-900/40 rounded-xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[140px] group">
+              <input type="file" id="file-input" class="hidden" multiple accept="image/*">
+              <svg class="h-8 w-8 text-zinc-500 group-hover:text-amber-500 mb-2 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p class="text-xs text-zinc-300 font-medium">画像をここにドラッグ＆ドロップ</p>
+              <p class="text-[10px] text-zinc-500 mt-1">またはクリックしてファイル選択</p>
+            </div>
+
+            <!-- ランダム表示時の「残り枚数」表示欄 (クロッキー中のみ中身が有効化) -->
+            <div id="sidebar-unseen-area" class="hidden mt-4 bg-zinc-950/40 border border-zinc-800 rounded-xl p-4">
+              <span class="text-xs text-zinc-500 uppercase tracking-wider block mb-1">UNSEEN IMAGES</span>
+              <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-bold text-amber-500" id="sidebar-unseen-count">00</span>
+                <span class="text-xs text-zinc-400">枚の未表示画像あり</span>
+              </div>
+              <p class="text-[10px] text-zinc-500 mt-1.5 leading-snug">
+                ※ 6時間以内に表示された画像は除外されています
+              </p>
+            </div>
+          </div>
+
+          <!-- 保存画像の一覧・管理トリガーボタン (余計なマージンを排除してドロップエリアの真下に配置) -->
+          <div class="border-t border-zinc-700/50 pt-4">
+            <button id="btn-open-manager" class="w-full py-2.5 bg-zinc-900 hover:bg-zinc-950 text-zinc-300 hover:text-amber-400 border border-zinc-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-inner">
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              </svg>
+              保存画像の一覧・管理
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           右側 / 中央: メインビュー（状態により切り替え）
+           ========================================== -->
+      <section class="flex-grow flex flex-col justify-center">
+
+        <!-- 1. 初期状態 (スタート画面) -->
+        <div id="state-start" class="text-center space-y-6 max-w-lg mx-auto w-full">
+          <div class="bg-zinc-800/80 border border-zinc-700/60 p-8 rounded-2xl shadow-2xl backdrop-blur-md">
+            <h2 class="text-2xl font-extrabold text-zinc-100 mb-3">クロッキーを開始</h2>
+            <p class="text-xs text-zinc-400 leading-relaxed mb-6">
+              左側の「画像保存枠」にクロッキーで使用する画像を登録してください（最大50枚）。<br>
+              準備ができたら、下のスタートボタンを押して開始します。
+            </p>
+            
+            <button id="btn-start" class="w-full py-4 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold text-lg rounded-xl shadow-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] focus:outline-none focus:ring-4 focus:ring-amber-500/50 mb-6">
+              スタート
+            </button>
+
+            <!-- 3. タイマー設定エリア（スタートボタンの下） -->
+            <div class="border-t border-zinc-700/50 pt-6 mt-6">
+              <span class="text-xs text-zinc-400 block mb-3 font-medium tracking-wider">タイマー設定</span>
+              <div class="flex items-center justify-center gap-6">
+                <!-- 分設定 -->
+                <div class="flex flex-col items-center">
+                  <button id="btn-min-up" class="text-zinc-500 hover:text-amber-500 transition-colors p-1" title="分を増やす">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7" />
+                    </svg>
+                  </button>
+                  <div class="flex items-baseline gap-1 my-1">
+                    <span id="config-min-val" class="text-3xl font-bold font-mono tracking-wider">03</span>
+                    <span class="text-xs text-zinc-500">分</span>
+                  </div>
+                  <button id="btn-min-down" class="text-zinc-500 hover:text-amber-500 transition-colors p-1" title="分を減らす">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+
+                <span class="text-3xl font-mono text-zinc-700 self-center mb-5">:</span>
+
+                <!-- 秒設定 -->
+                <div class="flex flex-col items-center">
+                  <button id="btn-sec-up" class="text-zinc-500 hover:text-amber-500 transition-colors p-1" title="秒を増やす">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7" />
+                    </svg>
+                  </button>
+                  <div class="flex items-baseline gap-1 my-1">
+                    <span id="config-sec-val" class="text-3xl font-bold font-mono tracking-wider">00</span>
+                    <span class="text-xs text-zinc-500">秒</span>
+                  </div>
+                  <button id="btn-sec-down" class="text-zinc-500 hover:text-amber-500 transition-colors p-1" title="秒を減らす">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <!-- タイマー設定のリセットボタン -->
+              <button id="btn-timer-reset" class="mt-4 text-[11px] text-zinc-500 hover:text-zinc-300 underline focus:outline-none transition-colors block mx-auto">
+                設定をリセット
+              </button>
+            </div>
+
+          </div>
+          <p class="text-xs text-zinc-500 bg-zinc-950/40 py-2 px-4 rounded-full inline-block">
+            ※ 画像ファイルはブラウザに安全に永続保存されます
+          </p>
+        </div>
+
+        <!-- 2. クロッキー中画面 -->
+        <div id="state-croquis" class="hidden w-full flex flex-col lg:flex-row items-stretch gap-6 h-full">
+          
+          <!-- 中央: 画像表示エリア -->
+          <div class="flex-grow flex flex-col items-center justify-between bg-zinc-950/60 border border-zinc-800 rounded-2xl p-6 relative min-h-[50vh] lg:min-h-[65vh]">
+            <!-- 画像コンテナ -->
+            <div class="w-full flex-grow flex items-center justify-center overflow-hidden rounded-lg bg-zinc-900/40 relative">
+              <!-- ローディングインジケータ -->
+              <div id="image-loader" class="absolute inset-0 flex items-center justify-center bg-zinc-950/80 z-10 transition-opacity duration-300">
+                <div class="flex flex-col items-center gap-2">
+                  <svg class="animate-spin h-8 w-8 text-amber-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span class="text-xs text-zinc-400">読み込み中...</span>
+                </div>
+              </div>
+              <!-- メイン画像 -->
+              <img id="croquis-image" src="" alt="クロッキー画像" class="max-w-full max-h-[45vh] lg:max-h-[55vh] object-contain shadow-2xl transition-all duration-300" style="display: none;" onerror="handleImageError()">
+              
+              <!-- 画像が空の場合等の警告プレースホルダー -->
+              <div id="image-error-box" class="hidden flex flex-col items-center justify-center p-6 text-center max-w-md">
+                <svg class="h-12 w-12 text-amber-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <h3 class="text-base font-bold text-zinc-200 mb-1">画像がありません</h3>
+                <p class="text-xs text-zinc-400" id="error-message-text">左側の「画像保存枠」から、クロッキー用の画像を1枚以上追加してください。</p>
+              </div>
+            </div>
+
+            <!-- 画像ファイル名表示 -->
+            <div id="image-title" class="text-xs text-zinc-500 mt-3 truncate max-w-full italic">読み込み待ち</div>
+
+            <!-- 8. 終了ボタン (画像中央下) -->
+            <div class="mt-4 w-full flex justify-center">
+              <button id="btn-end" class="px-8 py-3 bg-red-600/90 hover:bg-red-600 text-white font-bold text-sm rounded-full shadow-lg hover:shadow-red-900/20 transition-all focus:outline-none">
+                クロッキー会を終了する
+              </button>
+            </div>
+          </div>
+
+          <!-- 右側: タイマー表示と一時停止ボタン -->
+          <div class="lg:w-48 flex flex-col justify-center items-center bg-zinc-800/30 border border-zinc-800 p-6 rounded-2xl text-center self-center lg:self-stretch">
+            <span class="text-xs text-zinc-500 uppercase tracking-widest block mb-2 font-medium">COUNTDOWN</span>
+            <!-- タイマー表示 -->
+            <div id="timer-display" class="text-5xl lg:text-6xl font-mono font-bold tracking-tight transition-all duration-300">03:00</div>
+            
+            <!-- 7. ストップボタン (タイマーの下) -->
+            <button id="btn-stop" class="mt-6 w-full py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 font-bold rounded-xl shadow-md transition-all text-xs">
+              一時停止
+            </button>
+          </div>
+
+        </div>
+
+        <!-- 3. 画像一覧画面 (終了後) -->
+        <div id="state-gallery" class="hidden w-full space-y-6">
+          <div class="bg-zinc-800/50 border border-zinc-800 p-6 rounded-2xl shadow-xl backdrop-blur-md">
+            <div class="text-center max-w-xl mx-auto mb-6">
+              <h2 class="text-2xl font-extrabold text-zinc-100 mb-2">今回のクロッキー画像一覧</h2>
+              <p class="text-xs text-zinc-400">
+                本日のクロッキーで表示された画像の一覧です。
+              </p>
+            </div>
+
+            <!-- ギャラリーグリッド -->
+            <div id="gallery-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              <!-- JSで動的にカードを挿入 -->
+            </div>
+
+            <!-- 下部コントロールエリア (10. 完了ボタンのみ) -->
+            <div class="mt-8 pt-6 border-t border-zinc-700/60 flex items-center justify-center">
+              <!-- 10. 完了ボタン -->
+              <button id="btn-complete" class="w-full sm:w-auto px-12 py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 font-bold rounded-xl shadow-lg transition-all text-sm">
+                完了 (初期状態に戻る)
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ==========================================
+       モーダル: 保存画像の一覧・管理
+       ========================================== -->
+  <div id="manager-modal" class="hidden fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-700/80 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      
+      <!-- モーダルヘッダー -->
+      <div class="p-4 md:p-6 border-b border-zinc-800 flex justify-between items-center bg-zinc-950/40">
+        <div class="flex items-center gap-2">
+          <h3 class="text-lg font-bold text-amber-500">保存画像の一覧・管理</h3>
+          <span id="modal-count-badge" class="text-xs bg-zinc-800 text-zinc-400 px-2.5 py-0.5 rounded-full font-mono">0 / 50</span>
+        </div>
+        <button id="btn-close-manager" class="text-zinc-400 hover:text-zinc-200 transition-colors">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- モーダル内のドラッグ＆ドロップ（1. 面積を大幅に拡大してドロップしやすく調整） -->
+      <div class="p-4 bg-zinc-950/30 border-b border-zinc-800">
+        <div id="modal-drop-zone" class="border-2 border-dashed border-zinc-700 hover:border-amber-500/70 bg-zinc-900/20 rounded-xl py-8 px-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group">
+          <svg class="h-7 w-7 text-zinc-500 group-hover:text-amber-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          <span class="text-xs text-zinc-300 font-medium">ここへドラッグ＆ドロップ、またはクリックして画像を追加登録できます</span>
+          <span class="text-[10px] text-zinc-500">（画像ファイルを重ねるようにドロップしてください）</span>
+        </div>
+      </div>
+
+      <!-- モーダルコンテンツ（画像グリッド） -->
+      <div class="p-4 md:p-6 overflow-y-auto flex-grow bg-zinc-900">
+        <!-- 操作メニュー -->
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 text-xs">
+          <div class="flex items-center gap-2">
+            <button id="btn-select-all" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded font-medium transition-colors">
+              すべて選択
+            </button>
+            <button id="btn-deselect-all" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded font-medium transition-colors">
+              選択解除
+            </button>
+          </div>
+          <div class="flex items-center gap-2">
+            <!-- 複数削除 -->
+            <button id="btn-delete-selected" class="px-3 py-1.5 bg-red-950/60 hover:bg-red-900/60 text-red-400 border border-red-800/60 rounded font-bold transition-all flex items-center gap-1">
+              選択した画像を削除
+            </button>
+            <!-- 一括全削除 -->
+            <button id="btn-delete-all" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded font-bold transition-all">
+              全画像を削除 (一括)
+            </button>
+          </div>
+        </div>
+
+        <!-- 空状態の表示 -->
+        <div id="manager-empty-state" class="hidden text-center py-12 text-zinc-500 text-xs">
+          現在保存されている画像はありません。左側の保存枠か、上の追加エリアから画像を登録してください。
+        </div>
+
+        <!-- サムネイルグリッド -->
+        <div id="manager-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+          <!-- 動的読み込み -->
+        </div>
+      </div>
+
+      <!-- モーダルフッター -->
+      <div class="p-4 border-t border-zinc-800 flex justify-end bg-zinc-950/40">
+        <button id="btn-close-manager-footer" class="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 font-bold rounded-lg text-xs transition-all">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="p-4 text-center text-[10px] text-zinc-600 border-t border-zinc-900 no-print">
+    アニメ美術サークル_クロッキー © 2026
+  </footer>
+
+  <!-- ==========================================
+       Javascript 処理部 (IndexedDB & アプリロジック)
+       ========================================= -->
+  <script>
+    // ==========================================
+    // 1. IndexedDB 設定 (大容量ローカルストレージ用)
+    // ==========================================
+    const DB_NAME = 'CroquisCircleDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'images';
+    let db = null;
+
+    // DBを初期化して開く関数
+    function initDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        
+        request.onupgradeneeded = function(e) {
+          const dbInstance = e.target.result;
+          if (!dbInstance.objectStoreNames.contains(STORE_NAME)) {
+            // 自動増分キー 'id' でオブジェクトストアを作成
+            dbInstance.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+
+        request.onsuccess = function(e) {
+          db = e.target.result;
+          resolve(db);
+        };
+
+        request.onerror = function(e) {
+          console.error("IndexedDBのオープンに失敗しました:", e);
+          reject(e);
+        };
+      });
+    }
+
+    // 画像データをDBに保存する
+    function saveImageToDB(fileData) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.add(fileData);
+
+        request.onsuccess = function() {
+          resolve(request.result); // 挿入されたキーのIDを返す
+        };
+
+        request.onerror = function(e) {
+          reject(e);
+        };
+      });
+    }
+
+    // 全画像データをDBから取得する
+    function getAllImagesFromDB() {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.getAll();
+
+        request.onsuccess = function() {
+          resolve(request.result);
+        };
+
+        request.onerror = function(e) {
+          reject(e);
+        };
+      });
+    }
+
+    // 指定のIDの画像をDBから削除する
+    function deleteImageFromDB(id) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.delete(Number(id));
+
+        request.onsuccess = function() {
+          resolve();
+        };
+
+        request.onerror = function(e) {
+          reject(e);
+        };
+      });
+    }
+
+    // すべての画像をDBから削除する
+    function clearAllImagesFromDB() {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.clear();
+
+        request.onsuccess = function() {
+          resolve();
+        };
+
+        request.onerror = function(e) {
+          reject(e);
+        };
+      });
+    }
+
+
+    // ==========================================
+    // 2. アプリケーション状態管理 & 変数
+    // ==========================================
+    let appState = 'start'; // 'start' | 'croquis' | 'gallery'
+    let timerInterval = null;
+    let timerSeconds = 180; // 現在の残り秒数
+    let isPaused = false;
+
+    // タイマー調整設定（デフォルトは 3分 00秒）
+    let configMinutes = 3;
+    let configSeconds = 0;
+
+    // メモリ上の画像保持
+    let allImages = [];        // 登録されている全ての画像データ
+    let unseenImages = [];     // まだ表示されていない残りの候補画像
+    let currentImage = null;   // 現在表示中の画像
+    let sessionHistory = [];   // 今回のクロッキー会で実際に表示した画像の履歴
+
+    // 6時間制限用のミリ秒換算
+    const EXCLUDE_TIME_LIMIT = 6 * 60 * 60 * 1000;
+    const MAX_IMAGES_LIMIT = 50;
+
+
+    // ==========================================
+    // 3. DOM要素の取得
+    // ==========================================
+    const leftSidebar = document.getElementById('left-sidebar');
+    const stateStart = document.getElementById('state-start');
+    const stateCroquis = document.getElementById('state-croquis');
+    const stateGallery = document.getElementById('state-gallery');
+
+    const btnStart = document.getElementById('btn-start');
+    const btnEnd = document.getElementById('btn-end');
+    const btnStop = document.getElementById('btn-stop');
+    const btnComplete = document.getElementById('btn-complete');
+
+    const dropZone = document.getElementById('drop-zone');
+    const modalDropZone = document.getElementById('modal-drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const saveCountBadge = document.getElementById('save-count-badge');
+    const modalCountBadge = document.getElementById('modal-count-badge');
+
+    const croquisImage = document.getElementById('croquis-image');
+    const imageLoader = document.getElementById('image-loader');
+    const imageErrorBox = document.getElementById('image-error-box');
+    const errorMessageText = document.getElementById('error-message-text');
+    const imageTitle = document.getElementById('image-title');
+
+    const timerDisplay = document.getElementById('timer-display');
+    const sidebarUnseenArea = document.getElementById('sidebar-unseen-area');
+    const sidebarUnseenCount = document.getElementById('sidebar-unseen-count');
+    const galleryGrid = document.getElementById('gallery-grid');
+
+    // タイマー設定ボタン等
+    const labelMin = document.getElementById('config-min-val');
+    const labelSec = document.getElementById('config-sec-val');
+    const btnMinUp = document.getElementById('btn-min-up');
+    const btnMinDown = document.getElementById('btn-min-down');
+    const btnSecUp = document.getElementById('btn-sec-up');
+    const btnSecDown = document.getElementById('btn-sec-down');
+    const btnTimerReset = document.getElementById('btn-timer-reset');
+
+    // 管理モーダル関連
+    const managerModal = document.getElementById('manager-modal');
+    const btnOpenManager = document.getElementById('btn-open-manager');
+    const btnCloseManager = document.getElementById('btn-close-manager');
+    const btnCloseManagerFooter = document.getElementById('btn-close-manager-footer');
+    const managerGrid = document.getElementById('manager-grid');
+    const managerEmptyState = document.getElementById('manager-empty-state');
+    
+    const btnSelectAll = document.getElementById('btn-select-all');
+    const btnDeselectAll = document.getElementById('btn-deselect-all');
+    const btnDeleteSelected = document.getElementById('btn-delete-selected');
+    const btnDeleteAll = document.getElementById('btn-delete-all');
+
+    // トースト通知関連
+    const toastMessage = document.getElementById('toast-message');
+    const toastText = document.getElementById('toast-text');
+
+
+    // ==========================================
+    // 4. アプリケーション初期化
+    // ==========================================
+    window.addEventListener('load', async function() {
+      try {
+        await initDB();
+        await loadAndSyncImages();
+        setupTimerSettings();
+        switchState('start');
+      } catch (err) {
+        showToast("システムの初期化に失敗しました。IndexedDBを有効にしてください。");
+      }
+    });
+
+    // メモリ配列とUIの同期
+    async function loadAndSyncImages() {
+      allImages = await getAllImagesFromDB();
+      // ソート順（最新が上）
+      allImages.sort((a, b) => b.id - a.id);
+
+      const count = allImages.length;
+      saveCountBadge.textContent = `${count} / ${MAX_IMAGES_LIMIT}`;
+      modalCountBadge.textContent = `${count} / ${MAX_IMAGES_LIMIT}`;
+
+      // クロッキー中なら未表示カウントを更新
+      if (appState === 'croquis') {
+        updateSidebarUnseenUI();
+      }
+    }
+
+
+    // ==========================================
+    // 5. 画面状態の切り替え
+    // ==========================================
+    function switchState(state) {
+      appState = state;
+      
+      // 非表示初期化
+      stateStart.classList.add('hidden');
+      stateCroquis.classList.add('hidden');
+      stateGallery.classList.add('hidden');
+      leftSidebar.classList.remove('hidden'); // 常時表示に戻す
+      sidebarUnseenArea.classList.add('hidden');
+
+      if (state === 'start') {
+        stateStart.classList.remove('hidden');
+        resetTimer();
+        isPaused = false;
+        btnStop.textContent = '一時停止';
+        btnStop.className = "mt-6 w-full py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 font-bold rounded-xl shadow-md transition-all text-xs";
+      } else if (state === 'croquis') {
+        stateCroquis.classList.remove('hidden');
+        sidebarUnseenArea.classList.remove('hidden');
+        updateSidebarUnseenUI();
+      } else if (state === 'gallery') {
+        stateGallery.classList.remove('hidden');
+        leftSidebar.classList.add('hidden'); // ギャラリー時のみ左サイドバーを完全に隠す
+        renderGallery();
+      }
+    }
+
+
+    // ==========================================
+    // 6. 画像データの読み込み・ドラッグ＆ドロップ処理
+    // ==========================================
+    
+    // ドロップゾーンへのイベント紐付け
+    setupDropZone(dropZone);
+    setupDropZone(modalDropZone);
+
+    function setupDropZone(element) {
+      // クリックでファイル選択
+      element.addEventListener('click', (e) => {
+        // 子要素がクリックされたときにバブリングで2重に発生するのを避けるため
+        if (e.target === element || element.contains(e.target)) {
+          fileInput.click();
+        }
+      });
+
+      // ドラッグオーバー等
+      element.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        element.classList.add('drag-over');
+      });
+
+      element.addEventListener('dragleave', () => {
+        element.classList.remove('drag-over');
+      });
+
+      element.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        element.classList.remove('drag-over');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          await handleFileAddition(files);
+        }
+      });
+    }
+
+    fileInput.addEventListener('change', async (e) => {
+      const files = e.target.files;
+      if (files.length > 0) {
+        await handleFileAddition(files);
+        fileInput.value = ''; // リセットして再選択を可能にする
+      }
+    });
+
+    // ファイル追加共通処理
+    async function handleFileAddition(files) {
+      let addedCount = 0;
+      let limitExceeded = false;
+
+      for (let file of files) {
+        if (!file.type.startsWith('image/')) {
+          continue; // 画像以外はスキップ
+        }
+
+        // 現在の枚数チェック
+        const currentCount = await getDBCount();
+        if (currentCount >= MAX_IMAGES_LIMIT) {
+          limitExceeded = true;
+          break;
+        }
+
+        // 画像ファイルをBase64 DataURLに変換して保存
+        try {
+          const dataURL = await fileToDataURL(file);
+          const imageData = {
+            name: file.name,
+            data: dataURL,
+            addedAt: Date.now()
+          };
+          await saveImageToDB(imageData);
+          addedCount++;
+        } catch (err) {
+          console.error("画像の変換・保存に失敗しました:", err);
+        }
+      }
+
+      if (addedCount > 0) {
+        showToast(`${addedCount}枚の画像を保存しました。`);
+        await loadAndSyncImages();
+        
+        // クロッキー進行中の場合、追加された画像を即座に未表示プール（unseenImages）に追加する
+        if (appState === 'croquis') {
+          syncNewImagesToUnseenPool();
+        }
+
+        // モーダルが開いていれば再描画
+        if (!managerModal.classList.contains('hidden')) {
+          renderManagerList();
+        }
+      }
+
+      if (limitExceeded) {
+        showToast(`画像は最大${MAX_IMAGES_LIMIT}枚までしか登録できません。一部登録できなかった画像があります。`, true);
+      }
+    }
+
+    function getDBCount() {
+      return new Promise((resolve) => {
+        if (!db) return resolve(0);
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.count();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => resolve(0);
+      });
+    }
+
+    // File オブジェクトを Base64 文字列に
+    function fileToDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+      });
+    }
+
+
+    // ==========================================
+    // 7. 画像削除（一括、複数選択）
+    // ==========================================
+    
+    // 複数選択された画像を削除
+    btnDeleteSelected.onclick = async function() {
+      const checkedBoxes = managerGrid.querySelectorAll('input[type="checkbox"]:checked');
+      if (checkedBoxes.length === 0) {
+        showToast("削除する画像にチェックを入れてください。");
+        return;
+      }
+
+      if (confirm(`選択された ${checkedBoxes.length}枚 の画像を削除しますか？`)) {
+        for (let cb of checkedBoxes) {
+          const id = cb.dataset.id;
+          await deleteImageFromDB(id);
+        }
+        showToast("選択された画像を削除しました。");
+        await loadAndSyncImages();
+        
+        // 進行中の場合はプールからも削除
+        if (appState === 'croquis') {
+          rebuildUnseenPoolAfterDeletion();
+        }
+
+        renderManagerList();
+      }
+    };
+
+    // 一括全削除
+    btnDeleteAll.onclick = async function() {
+      if (allImages.length === 0) {
+        showToast("削除する画像がありません。");
+        return;
+      }
+
+      if (confirm("本当に保存されているすべての画像を削除しますか？\n(この操作は取り消せません)")) {
+        await clearAllImagesFromDB();
+        showToast("すべての画像を削除しました。");
+        await loadAndSyncImages();
+        
+        // クロッキー中なら強制的に停止して初期画面に戻る
+        if (appState === 'croquis') {
+          clearInterval(timerInterval);
+          switchState('start');
+        }
+
+        renderManagerList();
+      }
+    };
+
+
+    // ==========================================
+    // 8. クロッキーコントロール（自動切り替え・6時間ロジック）
+    // ==========================================
+    
+    // 未表示プールをフィルタリングして作成
+    function initUnseenPool() {
+      const recentStr = localStorage.getItem('croquis_recent_shown');
+      const recentList = recentStr ? JSON.parse(recentStr) : {}; // { imageId: timestamp }
+      const now = Date.now();
+
+      // 6時間経過したアイテムはLocalStorageからクリーニング
+      const cleanedRecentList = {};
+      for (const [id, timestamp] of Object.entries(recentList)) {
+        if (now - timestamp < EXCLUDE_TIME_LIMIT) {
+          cleanedRecentList[id] = timestamp;
+        }
+      }
+      localStorage.setItem('croquis_recent_shown', JSON.stringify(cleanedRecentList));
+
+      // 候補から除外
+      unseenImages = allImages.filter(img => !cleanedRecentList[img.id]);
+
+      // 候補がゼロで、全体画像が1枚以上ある場合はリセット
+      if (unseenImages.length === 0 && allImages.length > 0) {
+        unseenImages = [...allImages];
+        localStorage.removeItem('croquis_recent_shown');
+        showToast("全ての表示候補が消費されたため、表示履歴をリセットしました。");
+      }
+
+      updateSidebarUnseenUI();
+    }
+
+    // 進行中に画像が新しく追加された際、未表示プールを同期する
+    function syncNewImagesToUnseenPool() {
+      const recentStr = localStorage.getItem('croquis_recent_shown');
+      const recentList = recentStr ? JSON.parse(recentStr) : {};
+      const now = Date.now();
+
+      allImages.forEach(img => {
+        const isAlreadyInUnseen = unseenImages.some(u => u.id === img.id);
+        const isShownRecently = (recentList[img.id] && (now - recentList[img.id] < EXCLUDE_TIME_LIMIT));
+        const isCurrentActive = currentImage && currentImage.id === img.id;
+
+        if (!isAlreadyInUnseen && !isShownRecently && !isCurrentActive) {
+          unseenImages.push(img);
+        }
+      });
+
+      updateSidebarUnseenUI();
+    }
+
+    // 進行中に画像が削除された場合、未表示プールを再構築する
+    function rebuildUnseenPoolAfterDeletion() {
+      unseenImages = unseenImages.filter(u => allImages.some(img => img.id === u.id));
+      
+      if (currentImage && !allImages.some(img => img.id === currentImage.id)) {
+        nextSlide();
+      }
+
+      updateSidebarUnseenUI();
+    }
+
+    function updateSidebarUnseenUI() {
+      sidebarUnseenCount.textContent = String(unseenImages.length).padStart(2, '0');
+    }
+
+    // 次のスライドへ進む
+    function nextSlide() {
+      if (allImages.length === 0) {
+        showLoading(false);
+        croquisImage.style.display = 'none';
+        errorMessageText.textContent = "左側の「画像保存枠」から、クロッキー用の画像を1枚以上追加してください。";
+        imageErrorBox.classList.remove('hidden');
+        imageTitle.textContent = "画像がありません";
+        clearInterval(timerInterval);
+        return;
+      }
+
+      if (unseenImages.length === 0) {
+        initUnseenPool();
+      }
+
+      showLoading(true);
+      imageErrorBox.classList.add('hidden');
+      croquisImage.style.display = 'none';
+
+      // ランダムに選定
+      const randomIndex = Math.floor(Math.random() * unseenImages.length);
+      currentImage = unseenImages[randomIndex];
+
+      // 未表示リストから除外
+      unseenImages.splice(randomIndex, 1);
+      updateSidebarUnseenUI();
+
+      // 6時間ルール用ログに記録
+      markAsShown(currentImage.id);
+
+      // セッションの表示履歴に格納
+      if (!sessionHistory.some(item => item.id === currentImage.id)) {
+        sessionHistory.push(currentImage);
+      }
+
+      // 画像パスを設定してオンロードを待つ
+      croquisImage.src = currentImage.data;
+      imageTitle.textContent = currentImage.name;
+    }
+
+    // 履歴マーク
+    function markAsShown(id) {
+      const recentStr = localStorage.getItem('croquis_recent_shown');
+      const recentList = recentStr ? JSON.parse(recentStr) : {};
+      recentList[id] = Date.now();
+      localStorage.setItem('croquis_recent_shown', JSON.stringify(recentList));
+    }
+
+    croquisImage.onload = function() {
+      showLoading(false);
+      croquisImage.style.display = 'block';
+    };
+
+    function handleImageError() {
+      showLoading(false);
+      croquisImage.style.display = 'none';
+      errorMessageText.textContent = "画像の表示処理に問題が発生しました。ファイルが破損しているか、非対応形式の可能性があります。";
+      imageErrorBox.classList.remove('hidden');
+      imageTitle.textContent = "読み込みエラー";
+    }
+
+    function showLoading(show) {
+      if (show) {
+        imageLoader.classList.remove('opacity-0');
+        imageLoader.classList.add('opacity-100');
+        imageLoader.style.pointerEvents = 'auto';
+      } else {
+        imageLoader.classList.remove('opacity-100');
+        imageLoader.classList.add('opacity-0');
+        imageLoader.style.pointerEvents = 'none';
+      }
+    }
+
+
+    // ==========================================
+    // 9. タイマー設定 & カウントダウンロジック
+    // ==========================================
+    
+    // 3. タイマーの増減設定イベント
+    function setupTimerSettings() {
+      updateConfigTimerUI();
+
+      btnMinUp.onclick = () => {
+        configMinutes = (configMinutes + 1) % 60;
+        updateConfigTimerUI();
+      };
+      btnMinDown.onclick = () => {
+        configMinutes = (configMinutes - 1 + 60) % 60;
+        updateConfigTimerUI();
+      };
+      btnSecUp.onclick = () => {
+        configSeconds = (configSeconds + 1) % 60;
+        updateConfigTimerUI();
+      };
+      btnSecDown.onclick = () => {
+        configSeconds = (configSeconds - 1 + 60) % 60;
+        updateConfigTimerUI();
+      };
+      btnTimerReset.onclick = () => {
+        configMinutes = 3;
+        configSeconds = 0;
+        updateConfigTimerUI();
+        showToast("タイマー設定をリセットしました（3分00秒）");
+      };
+    }
+
+    function updateConfigTimerUI() {
+      labelMin.textContent = String(configMinutes).padStart(2, '0');
+      labelSec.textContent = String(configSeconds).padStart(2, '0');
+    }
+
+    function startTimer() {
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (!isPaused) {
+          timerSeconds--;
+          updateTimerDisplay();
+
+          // 5. 10秒前になったら、10秒間だけカウントダウンの数字は赤色に
+          if (timerSeconds <= 10) {
+            timerDisplay.classList.add('text-red-500', 'animate-pulse');
+            timerDisplay.classList.remove('text-zinc-100');
+          } else {
+            timerDisplay.classList.remove('text-red-500', 'animate-pulse');
+            timerDisplay.classList.add('text-zinc-100');
+          }
+
+          // 6. 設定時間経過で自動変更
+          if (timerSeconds <= 0) {
+            // タイマーを設定時間（config値）にリセット
+            timerSeconds = (configMinutes * 60) + configSeconds;
+            if (timerSeconds <= 0) timerSeconds = 180; // 0分0秒時はデフォルト3分
+            updateTimerDisplay();
+            nextSlide();
+          }
+        }
+      }, 1000);
+    }
+
+    function resetTimer() {
+      clearInterval(timerInterval);
+      // 表示タイマーを設定時間にリセット
+      timerSeconds = (configMinutes * 60) + configSeconds;
+      if (timerSeconds <= 0) timerSeconds = 180;
+      updateTimerDisplay();
+      timerDisplay.classList.remove('text-red-500', 'animate-pulse');
+      timerDisplay.classList.add('text-zinc-100');
+    }
+
+    function updateTimerDisplay() {
+      const minutes = Math.floor(timerSeconds / 60);
+      const seconds = timerSeconds % 60;
+      timerDisplay.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+
+    // ==========================================
+    // 10. 管理画面 (一覧モーダル)
+    // ==========================================
+    function renderManagerList() {
+      managerGrid.innerHTML = '';
+      
+      if (allImages.length === 0) {
+        managerEmptyState.classList.remove('hidden');
+        return;
+      }
+      managerEmptyState.classList.add('hidden');
+
+      allImages.forEach(img => {
+        const item = document.createElement('div');
+        item.className = "bg-zinc-950 border border-zinc-800 rounded-lg p-2 flex flex-col justify-between relative group hover:border-amber-500/50 transition-all";
+        
+        item.innerHTML = `
+          <div class="aspect-square w-full rounded overflow-hidden bg-zinc-900 flex items-center justify-center relative">
+            <!-- 個別複数選択用チェックボックス -->
+            <input type="checkbox" data-id="${img.id}" class="absolute top-1.5 left-1.5 w-4 h-4 text-amber-500 rounded bg-zinc-800 border-zinc-700 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer z-10">
+            <img src="${img.data}" alt="${img.name}" class="max-w-full max-h-full object-contain">
+          </div>
+          <div class="mt-1.5 flex items-center justify-between gap-1">
+            <p class="text-[10px] text-zinc-400 truncate w-full" title="${img.name}">${img.name}</p>
+            <button data-id="${img.id}" class="btn-delete-single p-1 text-zinc-500 hover:text-red-400 transition-colors" title="この画像を削除">
+              <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        `;
+
+        // 個別削除イベント
+        item.querySelector('.btn-delete-single').onclick = async function(e) {
+          e.stopPropagation();
+          if (confirm(`この画像「${img.name}」を削除しますか？`)) {
+            await deleteImageFromDB(img.id);
+            showToast("画像を削除しました。");
+            await loadAndSyncImages();
+            
+            if (appState === 'croquis') {
+              rebuildUnseenPoolAfterDeletion();
+            }
+            renderManagerList();
+          }
+        };
+
+        managerGrid.appendChild(item);
+      });
+    }
+
+    // 全て選択 / 選択解除
+    btnSelectAll.onclick = function() {
+      const checkboxes = managerGrid.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach(cb => cb.checked = true);
+    };
+
+    btnDeselectAll.onclick = function() {
+      const checkboxes = managerGrid.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach(cb => cb.checked = false);
+    };
+
+
+    // ==========================================
+    // 11. クロッキー終了ギャラリー
+    // ==========================================
+    function renderGallery() {
+      galleryGrid.innerHTML = '';
+
+      if (sessionHistory.length === 0) {
+        galleryGrid.innerHTML = `
+          <div class="col-span-full py-12 text-center text-zinc-500 text-xs">
+            本日のセッションで描画した画像はありません。
+          </div>
+        `;
+        return;
+      }
+
+      sessionHistory.forEach(img => {
+        const card = document.createElement('div');
+        card.className = "bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg p-3 hover:border-amber-500/50 transition-all flex flex-col justify-between";
+        
+        card.innerHTML = `
+          <div class="aspect-video w-full overflow-hidden rounded bg-zinc-950 flex items-center justify-center">
+            <img src="${img.data}" alt="${img.name}" class="max-w-full max-h-full object-contain">
+          </div>
+          <div class="mt-2 text-center">
+            <p class="text-[11px] text-zinc-300 font-medium truncate" title="${img.name}">${img.name}</p>
+          </div>
+        `;
+        galleryGrid.appendChild(card);
+      });
+    }
+
+
+    // ==========================================
+    // 12. 完了フロー
+    // ==========================================
+    
+    // 10. 完了ボタン (完全初期状態へ戻る)
+    btnComplete.onclick = function() {
+      sessionHistory = [];
+      currentImage = null;
+      switchState('start');
+    };
+
+
+    // ==========================================
+    // 13. ボタン・UIイベント関連
+    // ==========================================
+    
+    // スタートボタン
+    btnStart.onclick = function() {
+      if (allImages.length === 0) {
+        showToast("クロッキーに使用する画像を「画像保存枠」から1枚以上追加してください。", true);
+        return;
+      }
+      
+      sessionHistory = [];
+      initUnseenPool();
+      switchState('croquis');
+      
+      // 設定タイマー秒数の読み込み
+      timerSeconds = (configMinutes * 60) + configSeconds;
+      if (timerSeconds <= 0) {
+        timerSeconds = 180; // 0秒の場合はデフォルト3分
+      }
+
+      nextSlide();
+      startTimer();
+    };
+
+    // 一時停止・再開
+    btnStop.onclick = function() {
+      isPaused = !isPaused;
+      if (isPaused) {
+        btnStop.textContent = 'タイマーを再開';
+        btnStop.className = "mt-6 w-full py-3 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold rounded-xl shadow-md transition-all text-xs";
+      } else {
+        btnStop.textContent = '一時停止';
+        btnStop.className = "mt-6 w-full py-3 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 font-bold rounded-xl shadow-md transition-all text-xs";
+      }
+    };
+
+    // 終了
+    btnEnd.onclick = function() {
+      clearInterval(timerInterval);
+      switchState('gallery');
+    };
+
+    // 管理画面を開く・閉じる
+    btnOpenManager.onclick = function() {
+      renderManagerList();
+      managerModal.classList.remove('hidden');
+    };
+
+    function closeManagerModal() {
+      managerModal.classList.add('hidden');
+    }
+    btnCloseManager.onclick = closeManagerModal;
+    btnCloseManagerFooter.onclick = closeManagerModal;
+
+
+    // ==========================================
+    // 14. ユーティリティ (トースト表示)
+    // ==========================================
+    let toastTimeout = null;
+    function showToast(message, isWarning = false) {
+      clearTimeout(toastTimeout);
+      toastText.textContent = message;
+      
+      if (isWarning) {
+        toastMessage.classList.add('border-red-500', 'text-red-400');
+        toastMessage.classList.remove('border-amber-500', 'text-amber-400');
+      } else {
+        toastMessage.classList.add('border-amber-500', 'text-amber-400');
+        toastMessage.classList.remove('border-red-500', 'text-red-400');
+      }
+
+      toastMessage.classList.remove('translate-y-[-100px]', 'opacity-0');
+      toastMessage.classList.add('translate-y-0', 'opacity-100');
+
+      toastTimeout = setTimeout(() => {
+        toastMessage.classList.add('translate-y-[-100px]', 'opacity-0');
+        toastMessage.classList.remove('translate-y-0', 'opacity-100');
+      }, 3500);
+    }
+
+  </script>
+</body>
+</html>
